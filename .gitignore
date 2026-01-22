@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 # Miscellaneous
 .DS_Store
 terminal.txt
+/src
