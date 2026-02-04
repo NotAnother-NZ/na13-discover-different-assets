@@ -7,14 +7,9 @@
     DEBUG_SHOW_BORDERS: false,
   };
 
-  // --- CONFIGURATION ---
   const REGION_OPEN_DELAY = 150;
   const LOGO_RESIZE_DURATION = 150;
-
-  // How many pixels FROM THE BOTTOM of the nav to check for color changes.
   const TRIGGER_POINT_OFFSET = 0;
-
-  // Delay for restoring theme after closing menu
   const THEME_RESTORE_DELAY = 800;
 
   const TOP_THRESHOLD_PX = 16;
@@ -28,7 +23,6 @@
     logoEnd: "var(--animation--logo-font-size-desktop-end)",
   };
 
-  // 1. Immediate Native Reset
   if (DEBUG_FLAGS.ENABLE_SCROLL_RESET) {
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
@@ -37,7 +31,6 @@
   const nav = document.querySelector("#nav");
   const topbar = document.querySelector("#topbar");
 
-  // Explicitly select the bottombar to ignore it
   const bottombar =
     document.querySelector("#bottombar") ||
     document.querySelector(".bottombar");
@@ -46,9 +39,15 @@
   const savedWrapper = document.querySelector("#saved-number-wrapper");
   const savedText = document.querySelector("#saved-number-text");
 
-  // Filter bgTargets: Ensure we NEVER track an element inside the nav or bottombar
+  const savedWrapperMobile = document.querySelector(
+    "#saved-number-wrapper-mobile",
+  );
+  const savedTextMobile = document.querySelector("#saved-number-text-mobile");
+
+  const hamSticks = document.querySelectorAll(".ham-stick");
+
   const bgTargets = Array.from(
-    document.querySelectorAll("[data-nav-bg]")
+    document.querySelectorAll("[data-nav-bg]"),
   ).filter((el) => {
     if (nav && nav.contains(el)) return false;
     if (bottombar && bottombar.contains(el)) return false;
@@ -83,6 +82,13 @@
     green: "var(--swatches--green)",
     white: "var(--swatches--white)",
     bone: "var(--swatches--white)",
+  };
+
+  const hamStickBgMap = {
+    transparent: "var(--swatches--green)",
+    green: "var(--swatches--black)",
+    white: "var(--swatches--black)",
+    bone: "var(--swatches--black)",
   };
 
   const topbarBorderMap = {
@@ -127,15 +133,12 @@
   let hasTriggeredTop = false;
   let isNavCompact = false;
 
-  // --- STATE FLAG FOR REGION MENU ---
   let isRegionOpen = false;
 
-  // --- HELPER: Detect Desktop Cursor ---
   const isDesktopWithCursor = () => {
     return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   };
 
-  // --- SCROLL LOCKING HELPERS ---
   const lockAllScroll = () => {
     if (typeof window.disableScroll === "function") {
       window.disableScroll();
@@ -192,10 +195,8 @@
     return Math.min(max, Math.max(min, n));
   };
 
-  // --- UPDATED LOGIC: Probe Calculation (Target TOPBAR, not NAV) ---
   const computeStableProbePx = () => {
     const fallback = 96;
-    // CRITICAL FIX: Use topbar geometry if available, as 'nav' wrapper changes size with menu
     const target = topbar || nav;
     if (!target) return fallback;
 
@@ -209,12 +210,10 @@
   let stableProbePx = computeStableProbePx();
   const getProbeY = () => stableProbePx;
 
-  // --- UPDATED LOGIC: Probe Point Geometry (Target TOPBAR, not NAV) ---
   const getProbePoint = () => {
     const xFallback = Math.floor(window.innerWidth / 2);
     const yFallback = 1;
 
-    // CRITICAL FIX: Use topbar geometry if available
     const target = topbar || nav;
 
     if (!target) {
@@ -228,14 +227,13 @@
     const x = clampNumber(
       Math.floor(rect.left + rect.width / 2),
       1,
-      Math.max(1, window.innerWidth - 2)
+      Math.max(1, window.innerWidth - 2),
     );
 
-    // Target the bottom edge of the TOPBAR
     const y = clampNumber(
       Math.floor(rect.bottom) - TRIGGER_POINT_OFFSET,
       1,
-      Math.max(1, window.innerHeight - 2)
+      Math.max(1, window.innerHeight - 2),
     );
     return { x, y };
   };
@@ -277,10 +275,16 @@
     return null;
   };
 
+  const viewRegionsBtn = document.querySelector("#view-regions");
+  const viewRegionsArrow = document.querySelector("#view-regions-arrow");
+  const navOpenDesktopBtn = document.querySelector("#nav-open-desktop");
+  const navCloseDesktopBtn = document.querySelector("#nav-close-desktop");
+  const navOverlay = document.querySelector("#nav-overlay");
+  const hamWrapper = document.querySelector("#ham-wrapper");
+
   const getActiveBgTarget = (dir, scrollY) => {
     const point = getProbePoint();
 
-    // Strategy 1: Elements From Point
     if (typeof document.elementsFromPoint === "function") {
       const stack = document.elementsFromPoint(point.x, point.y) || [];
 
@@ -289,22 +293,18 @@
           if (hit === bottombar) continue;
           if (bottombar.contains(hit)) continue;
         }
-        // Extra check: ignore overlay if hit
         if (navOverlay && (hit === navOverlay || navOverlay.contains(hit)))
           continue;
 
         const bgEl = findClosestBgElFromNode(hit);
         if (bgEl) return bgEl;
       }
-    }
-    // Fallback
-    else if (typeof document.elementFromPoint === "function") {
+    } else if (typeof document.elementFromPoint === "function") {
       const hit = document.elementFromPoint(point.x, point.y);
       const bgEl = findClosestBgElFromNode(hit);
       if (bgEl) return bgEl;
     }
 
-    // Strategy 2: Geometry Ranges
     const probeY = getProbeY();
     const docProbeY = scrollY + probeY;
 
@@ -332,6 +332,7 @@
     const navTextColor = navTextColorMap[bg];
     const savedWrapperBg = savedWrapperBgMap[bg];
     const savedTextColor = savedTextColorMap[bg];
+    const hamStickBg = hamStickBgMap[bg];
     const topbarBorder = topbarBorderMap[bg];
 
     if (!navBgColor || !navTextColor) return;
@@ -347,6 +348,17 @@
     if (savedWrapper && savedWrapperBg)
       savedWrapper.style.backgroundColor = savedWrapperBg;
     if (savedText && savedTextColor) savedText.style.color = savedTextColor;
+
+    if (savedWrapperMobile && savedWrapperBg)
+      savedWrapperMobile.style.backgroundColor = savedWrapperBg;
+    if (savedTextMobile && savedTextColor)
+      savedTextMobile.style.color = savedTextColor;
+
+    if (hamSticks && hamSticks.length && hamStickBg) {
+      hamSticks.forEach((stick) => {
+        if (stick) stick.style.backgroundColor = hamStickBg;
+      });
+    }
 
     if (DEBUG_FLAGS.ENABLE_BORDER_FIX) {
       const isTransparent = bg === "transparent";
@@ -371,7 +383,6 @@
     }
   };
 
-  // --- MODIFIED: Init Size Anim (Only for Desktop) ---
   const initSizeAnim = () => {
     if (!DEBUG_FLAGS.ENABLE_SIZE_ANIM) return;
     if (logotypes.length) {
@@ -380,7 +391,6 @@
           logo.style.transition = TRANSITION_SETTINGS;
         });
       } else {
-        // Mobile: remove transition to avoid conflict
         logotypes.forEach((logo) => {
           logo.style.transition = "";
         });
@@ -388,7 +398,6 @@
     }
   };
 
-  // --- MODIFIED: Apply Size State (Only for Desktop) ---
   const applySizeState = () => {
     if (!DEBUG_FLAGS.ENABLE_SIZE_ANIM) return;
     if (logotypes.length) {
@@ -397,7 +406,6 @@
           logo.style.fontSize = isNavCompact ? VARS.logoEnd : VARS.logoStart;
         });
       } else {
-        // Mobile/Tablet: Clear inline styles so CSS handles the size
         logotypes.forEach((logo) => {
           logo.style.fontSize = "";
         });
@@ -429,13 +437,9 @@
     activeBg = bg;
   };
 
-  // --- MODIFIED: Handle Top Trigger (Restrict Hover to Desktop) ---
   const handleTopTrigger = (scrollY) => {
     const isAtTop = scrollY <= TOP_THRESHOLD_PX;
 
-    // UPDATED LOGIC:
-    // Only allow the logo to expand if we are at the top AND the background is transparent.
-    // If the background is colored (green, white, bone), the logo stays compact.
     const isTransparent = activeBg === "transparent";
 
     if (isAtTop && isTransparent) {
@@ -443,7 +447,6 @@
       if (!hasTriggeredTop) {
         hasTriggeredTop = true;
 
-        // CHECK: Only play hover on Desktop
         if (
           isDesktopWithCursor() &&
           typeof window.playLogoHoverOnce === "function"
@@ -462,51 +465,36 @@
       typeof explicitDir === "number"
         ? explicitDir
         : scrollY > lastScrollY
-        ? 1
-        : scrollY < lastScrollY
-        ? -1
-        : 0;
+          ? 1
+          : scrollY < lastScrollY
+            ? -1
+            : 0;
 
-    // Theme update must happen first to ensure activeBg is set
     updateThemeFromScroll(dir, scrollY);
     handleTopTrigger(scrollY);
     lastScrollY = scrollY;
   };
 
-  // --- REGION MENU ELEMENTS ---
-  const viewRegionsBtn = document.querySelector("#view-regions");
-  const viewRegionsArrow = document.querySelector("#view-regions-arrow");
-  const navOpenDesktopBtn = document.querySelector("#nav-open-desktop");
-  const navCloseDesktopBtn = document.querySelector("#nav-close-desktop");
-  const navOverlay = document.querySelector("#nav-overlay");
-
   if (viewRegionsArrow) {
     viewRegionsArrow.style.transition = "transform 0.3s ease";
   }
 
-  // --- HELPER: DELAYED THEME RESTORE ---
   const delayedThemeRestore = () => {
     setTimeout(() => {
-      // Only restore if the menu is STILL closed.
       if (!isRegionOpen) {
-        // Force recalculation of probe metrics after layout settles
         stableProbePx = computeStableProbePx();
 
         const currentY = getScrollY();
-        rebuildBgRanges(currentY); // Ensure ranges are fresh
+        rebuildBgRanges(currentY);
         updateThemeFromScroll(0, currentY);
       }
     }, THEME_RESTORE_DELAY);
   };
 
-  // --- HELPER: ANIMATION SEQUENCES ---
-  // Triggered when opening
   const animateNavCardsIn = () => {
-    // 200ms initial delay (from your current code)
     setTimeout(() => {
       const cards = [1, 2, 3, 4, 5, 6];
       cards.forEach((id, index) => {
-        // 150ms stagger (from your current code)
         setTimeout(() => {
           if (
             window.rt &&
@@ -520,12 +508,9 @@
     }, 200);
   };
 
-  // Triggered when closing
   const animateNavCardsOut = () => {
-    // Instantly start, reverse order
     const cards = [6, 5, 4, 3, 2, 1];
     cards.forEach((id, index) => {
-      // 0.05s stagger
       setTimeout(() => {
         if (
           window.rt &&
@@ -538,77 +523,112 @@
     });
   };
 
-  // --- HELPER: CLOSE REGION MENU ---
   const closeRegionMenu = () => {
     isRegionOpen = false;
 
-    // 0. Trigger Out Animations Immediately
     animateNavCardsOut();
 
-    // 1. Reset Arrow
     if (viewRegionsArrow) {
       viewRegionsArrow.style.transform = "rotate(0deg)";
     }
 
-    // 2. Unlock ALL Scroll Instances
     unlockAllScroll();
 
-    // 3. Simulate Close Click
     if (navCloseDesktopBtn) {
       navCloseDesktopBtn.click();
     }
 
-    // 4. Trigger Delayed Theme Restore
     delayedThemeRestore();
   };
 
-  // --- EVENT: TOGGLE BUTTON (VIEW REGIONS) ---
+  const openRegionMenu = () => {
+    isRegionOpen = true;
+
+    if (viewRegionsArrow) {
+      viewRegionsArrow.style.transform = "rotate(540deg)";
+    }
+
+    lockAllScroll();
+
+    const isAlreadyGreen = activeBg === "green";
+    const isAlreadyCompact = isNavCompact === true;
+
+    const doFinalClick = () => {
+      setTimeout(() => {
+        if (navOpenDesktopBtn) navOpenDesktopBtn.click();
+        animateNavCardsIn();
+      }, REGION_OPEN_DELAY);
+    };
+
+    if (isAlreadyGreen && isAlreadyCompact) {
+      doFinalClick();
+    } else {
+      updateNavSize(true);
+      setTimeout(() => {
+        applyTheme("green");
+        activeBg = "green";
+        doFinalClick();
+      }, LOGO_RESIZE_DURATION);
+    }
+  };
+
+  const toggleRegionMenu = () => {
+    if (!navOpenDesktopBtn) return;
+    if (isRegionOpen) closeRegionMenu();
+    else openRegionMenu();
+  };
+
   if (viewRegionsBtn && navOpenDesktopBtn) {
     viewRegionsBtn.addEventListener("click", () => {
-      // IF OPEN -> CLOSE
-      if (isRegionOpen) {
-        closeRegionMenu();
-      }
-      // IF CLOSED -> OPEN
-      else {
-        isRegionOpen = true;
-
-        // 1. Rotate Arrow
-        if (viewRegionsArrow) {
-          viewRegionsArrow.style.transform = "rotate(540deg)";
-        }
-
-        // 2. Lock ALL Scroll Instances
-        lockAllScroll();
-
-        // 3. Theme & Click Sequence
-        const isAlreadyGreen = activeBg === "green";
-        const isAlreadyCompact = isNavCompact === true;
-
-        const doFinalClick = () => {
-          setTimeout(() => {
-            // Click the native button
-            navOpenDesktopBtn.click();
-            // Trigger the In Animations
-            animateNavCardsIn();
-          }, REGION_OPEN_DELAY);
-        };
-
-        if (isAlreadyGreen && isAlreadyCompact) {
-          doFinalClick();
-        } else {
-          updateNavSize(true);
-          setTimeout(() => {
-            applyTheme("green");
-            activeBg = "green";
-            doFinalClick();
-          }, LOGO_RESIZE_DURATION);
-        }
-      }
+      toggleRegionMenu();
     });
   }
 
-  // --- EVENT: NAV OVERLAY CLICK ---
+  if (hamWrapper && navOpenDesktopBtn) {
+    hamWrapper.addEventListener("click", (e) => {
+      if (
+        viewRegionsBtn &&
+        (e.target === viewRegionsBtn || viewRegionsBtn.contains(e.target))
+      )
+        return;
+      toggleRegionMenu();
+    });
+  }
+
+  const closeMenuFromMobileLink = (clickedNode) => {
+    if (!clickedNode) return false;
+
+    const match =
+      clickedNode && clickedNode.closest
+        ? clickedNode.closest("[data-mobile-menu-link]")
+        : null;
+
+    if (!match) return false;
+
+    if (!isRegionOpen) {
+      if (navCloseDesktopBtn) navCloseDesktopBtn.click();
+      unlockAllScroll();
+      delayedThemeRestore();
+      return true;
+    }
+
+    isRegionOpen = false;
+    animateNavCardsOut();
+    if (viewRegionsArrow) viewRegionsArrow.style.transform = "rotate(0deg)";
+    unlockAllScroll();
+    if (navCloseDesktopBtn) navCloseDesktopBtn.click();
+    delayedThemeRestore();
+    return true;
+  };
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      closeMenuFromMobileLink(e.target);
+    },
+    { passive: true },
+  );
+
   if (navOverlay) {
     navOverlay.addEventListener("click", () => {
       if (isRegionOpen) {
@@ -617,13 +637,11 @@
     });
   }
 
-  // --- EVENT: NATIVE CLOSE BUTTON SYNC ---
   if (navCloseDesktopBtn) {
     navCloseDesktopBtn.addEventListener("click", () => {
       if (isRegionOpen) {
-        // Triggers manual closing cleanup if user clicked "X" directly
         isRegionOpen = false;
-        animateNavCardsOut(); // Ensure cards animate out
+        animateNavCardsOut();
         if (viewRegionsArrow) viewRegionsArrow.style.transform = "rotate(0deg)";
         unlockAllScroll();
         delayedThemeRestore();
@@ -631,7 +649,6 @@
     });
   }
 
-  // --- LENIS SYNC & RESIZE ---
   const syncLenis = () => {
     if (
       window.rtSmoothScroll &&
@@ -667,15 +684,15 @@
         e && typeof e.scroll === "number"
           ? e.scroll
           : typeof lenis.scroll === "number"
-          ? lenis.scroll
-          : window.scrollY || 0;
+            ? lenis.scroll
+            : window.scrollY || 0;
 
       const dir =
         e && typeof e.direction === "number"
           ? e.direction
           : scrollY > lastScrollY
-          ? -1
-          : 0;
+            ? -1
+            : 0;
 
       tick(scrollY, dir);
     });
@@ -685,14 +702,13 @@
       () => {
         tick(window.scrollY || 0);
       },
-      { passive: true }
+      { passive: true },
     );
   }
 
   window.addEventListener(
     "resize",
     () => {
-      // Re-evaluate animation eligibility on resize (for device mode toggling)
       initSizeAnim();
       applySizeState();
 
@@ -702,7 +718,7 @@
       tick(y, 0);
       syncLenis();
     },
-    { passive: true }
+    { passive: true },
   );
 
   requestAnimationFrame(() => {

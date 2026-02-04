@@ -13,7 +13,7 @@ document.addEventListener(
 
     // --- Navbar Selectors ---
     const navItems = document.querySelectorAll(
-      "#topbar #logo-anim-wrapper, #topbar .nav-link, #topbar .nav-button"
+      "#topbar #logo-anim-wrapper, #topbar .nav-link, #topbar .nav-button, .ham-wrapper"
     );
 
     // --- Location & Map Selectors ---

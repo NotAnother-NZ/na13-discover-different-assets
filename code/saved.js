@@ -106,24 +106,50 @@
     return null;
   };
 
+  const getBadgeEls = () => {
+    const desktopWrapper = document.getElementById("saved-number-wrapper");
+    const desktopText = document.getElementById("saved-number-text");
+
+    const mobileWrapper = document.getElementById(
+      "saved-number-wrapper-mobile",
+    );
+    const mobileText = document.getElementById("saved-number-text-mobile");
+
+    const wrappers = [];
+    const texts = [];
+
+    if (desktopWrapper) wrappers.push(desktopWrapper);
+    if (mobileWrapper) wrappers.push(mobileWrapper);
+
+    if (desktopText) texts.push(desktopText);
+    if (mobileText) texts.push(mobileText);
+
+    return { wrappers, texts };
+  };
+
   const updateBadge = (animate = true) => {
     const count = getSaved().size;
-    const wrapper = document.getElementById("saved-number-wrapper");
-    const text = document.getElementById("saved-number-text");
 
-    if (!wrapper || !text) return;
+    const { wrappers, texts } = getBadgeEls();
+    if (!wrappers.length || !texts.length) return;
 
     if (count === 0) {
-      wrapper.style.display = "none";
+      for (let i = 0; i < wrappers.length; i++)
+        wrappers[i].style.display = "none";
     } else {
-      wrapper.style.display = "";
-      text.textContent = count >= 10 ? "9+" : count;
+      const label = count >= 10 ? "9+" : String(count);
 
-      if (animate) {
-        wrapper.classList.remove("badge-pop");
-        void wrapper.offsetWidth;
-        wrapper.classList.add("badge-pop");
+      for (let i = 0; i < wrappers.length; i++) {
+        const wrapper = wrappers[i];
+        wrapper.style.display = "";
+        if (animate) {
+          wrapper.classList.remove("badge-pop");
+          void wrapper.offsetWidth;
+          wrapper.classList.add("badge-pop");
+        }
       }
+
+      for (let i = 0; i < texts.length; i++) texts[i].textContent = label;
     }
   };
 
@@ -177,7 +203,7 @@
 
     if (opts && opts.preload) {
       requestAnimationFrame(() =>
-        setTimeout(() => btn.classList.remove("preload"), 100)
+        setTimeout(() => btn.classList.remove("preload"), 100),
       );
     }
   };
@@ -191,10 +217,10 @@
     document
       .querySelectorAll(
         `[data-saved-slug="${CSS.escape(
-          s
+          s,
         )}"], [data-ttd-popup-item="${CSS.escape(
-          s
-        )}"], [popup-content="${CSS.escape(s)}"]`
+          s,
+        )}"], [popup-content="${CSS.escape(s)}"]`,
       )
       .forEach((n) => {
         if (n.matches && n.matches(".save-icon-button, [id='popup-save']")) {
@@ -225,7 +251,7 @@
   const syncAllVisibleSaveButtons = (opts) => {
     const savedSet = getSaved();
     const buttons = document.querySelectorAll(
-      ".save-icon-button, [id='popup-save']"
+      ".save-icon-button, [id='popup-save']",
     );
     for (let i = 0; i < buttons.length; i++) {
       const btn = buttons[i];
@@ -323,23 +349,23 @@
 
       if (!shouldBeActive) removeCardFromSavedGrid(slug);
     },
-    true
+    true,
   );
 
   document.addEventListener(
     "pointerdown",
     () => scheduleFullSync({ preload: false, shake: false }),
-    true
+    true,
   );
   document.addEventListener(
     "keyup",
     () => scheduleFullSync({ preload: false, shake: false }),
-    true
+    true,
   );
   document.addEventListener(
     "focusin",
     () => scheduleFullSync({ preload: false, shake: false }),
-    true
+    true,
   );
 
   const setupObserver = () => {
@@ -394,7 +420,7 @@
 
       if (grid) {
         const cards = Array.from(
-          grid.querySelectorAll(".mason-grid-item[data-saved-slug]")
+          grid.querySelectorAll(".mason-grid-item[data-saved-slug]"),
         );
 
         const order = new Map();
