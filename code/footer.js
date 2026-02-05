@@ -1,80 +1,125 @@
 document.addEventListener("DOMContentLoaded", function () {
-  // --- CONFIGURATION ---
   const CONFIG = {
     selectors: {
-      // UNIQUE CONTAINERS (IDs)
-      desktopFooter: "#footer", // Desktop section
-      mobileFooter: "#footer-mobile", // Mobile/Tablet section
-
-      // MOBILE TARGET
-      // Inside #footer-mobile, where the images should stack
+      desktopFooter: "#footer",
+      mobileFooter: "#footer-mobile",
       mobileImageContainer: ".footer-trailing-image",
-
-      // DESKTOP LAYERING (Data Attributes)
-      // Elements inside desktop footer that must stay ON TOP of the image trail
       uiElements:
         "[data-footer-credit], [data-footer-credit-links], [data-footer-text]",
-
-      // INTERACTION (Data Attributes)
       linkGroups: "[data-footer-credit-links]",
-
-      // UTILITIES
-      timeElements: "[data-nz-time]", // For the live time update
+      timeElements: "[data-nz-time]",
     },
     images: {
       baseUrl:
-        "https://cdn.jsdelivr.net/gh/NotAnother-NZ/na13-discover-different-assets@main/footer_images/",
-      count: 17,
+        "https://cdn.jsdelivr.net/gh/NotAnother-NZ/na13-discover-different-assets@1.0.3/footer_images/",
+      count: 20,
       extension: ".webp",
       startAt: 1,
     },
     desktop: {
-      minWidth: 992, // Breakpoint to switch logic
+      minWidth: 992,
       trailCopies: 2,
       threshold: 50,
     },
     mobile: {
       maxVisible: 8,
-      randomRange: 40, // How far from center they scatter
+      randomRange: 40,
+    },
+    lazy: {
+      rootMargin: "900px 0px 900px 0px",
+      threshold: 0.01,
+      loadTimeoutMs: 12000,
     },
   };
 
-  // --- ASSET GENERATOR ---
-  const generatedImages = [];
-  for (let i = CONFIG.images.startAt; i <= CONFIG.images.count; i++) {
-    const img = new Image();
-    img.src = `${CONFIG.images.baseUrl}${i}${CONFIG.images.extension}`;
-    img.className = "footer-image-dynamic";
-    img.alt = "Footer Art";
-    img.style.display = "block";
-    generatedImages.push(img);
-  }
+  let generatedImages = null;
+  let imagesLoading = false;
+  let imagesLoaded = false;
 
-  // --- SHUFFLE IMAGES (Fisher-Yates Algorithm) ---
-  // This ensures a random order on every page load
-  for (let i = generatedImages.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [generatedImages[i], generatedImages[j]] = [
-      generatedImages[j],
-      generatedImages[i],
-    ];
-  }
-
-  // State tracking for resize handling
   let desktopCleanup = null;
   let mobileCleanup = null;
 
-  // --- MODULE: DESKTOP TRAIL ---
+  function buildImageUrls() {
+    const urls = [];
+    for (let i = CONFIG.images.startAt; i <= CONFIG.images.count; i++) {
+      urls.push(`${CONFIG.images.baseUrl}${i}${CONFIG.images.extension}`);
+    }
+    return urls;
+  }
+
+  function loadFooterImages() {
+    if (imagesLoaded) return Promise.resolve(generatedImages || []);
+    if (imagesLoading) {
+      return new Promise((resolve) => {
+        const poll = () => {
+          if (imagesLoaded) resolve(generatedImages || []);
+          else setTimeout(poll, 50);
+        };
+        poll();
+      });
+    }
+
+    imagesLoading = true;
+
+    const urls = buildImageUrls();
+    const imgs = urls.map((src) => {
+      const img = new Image();
+      img.className = "footer-image-dynamic";
+      img.alt = "Footer Art";
+      img.style.display = "block";
+      return { img, src };
+    });
+
+    let timeoutId;
+
+    const finish = () => {
+      if (imagesLoaded) return;
+      clearTimeout(timeoutId);
+      generatedImages = imgs.map((x) => x.img);
+      imagesLoaded = true;
+      imagesLoading = false;
+      handleLayoutChange();
+      window.addEventListener("resize", handleLayoutChange);
+    };
+
+    timeoutId = setTimeout(finish, CONFIG.lazy.loadTimeoutMs);
+
+    let remaining = imgs.length;
+    imgs.forEach(({ img, src }) => {
+      const done = () => {
+        remaining -= 1;
+        if (remaining <= 0) finish();
+      };
+      img.onload = done;
+      img.onerror = done;
+      img.src = src;
+      if (img.decode) {
+        img
+          .decode()
+          .then(() => {})
+          .catch(() => {});
+      }
+    });
+
+    return new Promise((resolve) => {
+      const poll = () => {
+        if (imagesLoaded) resolve(generatedImages || []);
+        else setTimeout(poll, 50);
+      };
+      poll();
+    });
+  }
+
   function initDesktopTrail() {
+    if (!generatedImages || !generatedImages.length) return null;
+
     const footer = document.querySelector(CONFIG.selectors.desktopFooter);
     if (!footer) return null;
 
-    // 1. Ensure Positioning Context
     if (getComputedStyle(footer).position === "static") {
       footer.style.position = "relative";
     }
 
-    // 2. Lift UI Elements
     const uiElements = footer.querySelectorAll(CONFIG.selectors.uiElements);
     uiElements.forEach((el) => {
       if (getComputedStyle(el).position === "static") {
@@ -83,7 +128,6 @@ document.addEventListener("DOMContentLoaded", function () {
       el.style.zIndex = "10";
     });
 
-    // 3. Create/Get Trail Container
     let trail = footer.querySelector(".footer-trail-container");
     if (!trail) {
       trail = document.createElement("div");
@@ -101,7 +145,6 @@ document.addEventListener("DOMContentLoaded", function () {
       footer.appendChild(trail);
     }
 
-    // 4. Logic Variables
     let imagesArray = [];
     let lastImageIndex = -1;
     let zIndexVal = 1;
@@ -114,7 +157,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const lerp = (start, end, t) => (1 - t) * start + t * end;
     const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
 
-    // Image Class
     class TrailImage {
       constructor(el, sourceIndex) {
         this.DOM = { el: el };
@@ -138,7 +180,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    // Populate using the shuffled generatedImages
     generatedImages.forEach((img, i) => {
       for (let j = 0; j < CONFIG.desktop.trailCopies; j++) {
         const clone = img.cloneNode(true);
@@ -147,22 +188,37 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
-    // Animation Logic
+    let seqIndex = 0;
+
     const showNextImage = () => {
       if (isHoveringLinks) return;
 
-      let available = imagesArray
-        .map((img, i) => ({ img, i }))
-        .filter(
-          (item) =>
-            !item.img.isActive() && item.img.sourceIndex !== lastImageIndex
-        )
-        .map((item) => item.i);
+      const total = imagesArray.length;
+      if (!total) return;
 
-      if (!available.length) available = imagesArray.map((_, i) => i);
+      let attempts = 0;
+      let candidateIdx = -1;
+      let candidateImg = null;
 
-      const idx = available[Math.floor(Math.random() * available.length)];
-      const trailImg = imagesArray[idx];
+      while (attempts < total) {
+        const idx = seqIndex % total;
+        seqIndex += 1;
+        attempts += 1;
+
+        const imgObj = imagesArray[idx];
+        if (!imgObj.isActive() && imgObj.sourceIndex !== lastImageIndex) {
+          candidateIdx = idx;
+          candidateImg = imgObj;
+          break;
+        }
+      }
+
+      if (!candidateImg) {
+        candidateIdx = (seqIndex - 1 + total) % total;
+        candidateImg = imagesArray[candidateIdx];
+      }
+
+      const trailImg = candidateImg;
       lastImageIndex = trailImg.sourceIndex;
 
       gsap.killTweensOf(trailImg.DOM.el);
@@ -187,12 +243,12 @@ document.addEventListener("DOMContentLoaded", function () {
             x: mousePos.x - trailImg.rect.width / 2,
             y: mousePos.y - trailImg.rect.height / 2,
           },
-          0
+          0,
         )
         .to(
           trailImg.DOM.el,
           { duration: 1, ease: "power1.out", opacity: 0 },
-          0.4
+          0.4,
         )
         .to(
           trailImg.DOM.el,
@@ -201,13 +257,12 @@ document.addEventListener("DOMContentLoaded", function () {
             ease: "quint.inOut",
             y: `+=${window.innerHeight / 2 + trailImg.rect.height / 2}`,
           },
-          0.4
+          0.4,
         );
     };
 
     const render = () => {
       const rect = footer.getBoundingClientRect();
-      // Ensure footer is in view
       if (
         rect.bottom > 0 &&
         rect.top < window.innerHeight &&
@@ -216,12 +271,12 @@ document.addEventListener("DOMContentLoaded", function () {
         smoothMousePos.x = lerp(
           smoothMousePos.x || mousePos.x,
           mousePos.x,
-          0.1
+          0.1,
         );
         smoothMousePos.y = lerp(
           smoothMousePos.y || mousePos.y,
           mousePos.y,
-          0.1
+          0.1,
         );
 
         if (
@@ -244,11 +299,9 @@ document.addEventListener("DOMContentLoaded", function () {
       mousePos.y = e.clientY - rect.top;
     };
 
-    // Attach Listeners
     footer.addEventListener("mousemove", handleMouseMove);
     animationFrameId = requestAnimationFrame(render);
 
-    // Link Hover Logic (Stops trail)
     const linkWrappers = footer.querySelectorAll(CONFIG.selectors.linkGroups);
     const setHoverTrue = () => (isHoveringLinks = true);
     const setHoverFalse = () => {
@@ -261,7 +314,6 @@ document.addEventListener("DOMContentLoaded", function () {
       el.addEventListener("mouseleave", setHoverFalse);
     });
 
-    // Cleanup
     return () => {
       footer.removeEventListener("mousemove", handleMouseMove);
       cancelAnimationFrame(animationFrameId);
@@ -273,26 +325,24 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-  // --- MODULE: MOBILE STACK ---
   function initMobileStack() {
+    if (!generatedImages || !generatedImages.length) return null;
+
     const mobileFooter = document.querySelector(CONFIG.selectors.mobileFooter);
     if (!mobileFooter) return null;
 
     const container = mobileFooter.querySelector(
-      CONFIG.selectors.mobileImageContainer
+      CONFIG.selectors.mobileImageContainer,
     );
     if (!container) return null;
 
-    // 1. Setup Container
     container.innerHTML = "";
-    // Ensure relative positioning so absolute children align to THIS div
     if (getComputedStyle(container).position === "static") {
       container.style.position = "relative";
     }
 
     const images = [];
 
-    // 2. Prepare Images (using the shuffled generatedImages)
     generatedImages.forEach((genImg) => {
       const clone = genImg.cloneNode(true);
 
@@ -302,7 +352,7 @@ document.addEventListener("DOMContentLoaded", function () {
         left: "50%",
         width: "100%",
         height: "auto",
-        maxWidth: "200px", // Restrict size on mobile
+        maxWidth: "200px",
         display: "block",
         margin: "0",
         padding: "0",
@@ -312,7 +362,6 @@ document.addEventListener("DOMContentLoaded", function () {
       images.push(clone);
     });
 
-    // Initial state: Hidden, centered (xPercent/yPercent handles the -50%)
     gsap.set(images, {
       autoAlpha: 0,
       zIndex: 0,
@@ -329,7 +378,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const randomOffset = (min, max) => min + Math.random() * (max - min);
 
-    // 3. Animation Function
     const showNext = () => {
       const nextImage = images[currentIndex];
       currentIndex = (currentIndex + 1) % images.length;
@@ -338,7 +386,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const range = CONFIG.mobile.randomRange;
 
-      // SET Position
       gsap.set(nextImage, {
         autoAlpha: 1,
         zIndex: stackZIndex,
@@ -348,43 +395,36 @@ document.addEventListener("DOMContentLoaded", function () {
         y: randomOffset(-range, range),
       });
 
-      // Remove Oldest
       if (visibleStack.length > CONFIG.mobile.maxVisible) {
         const oldest = visibleStack.shift();
         gsap.set(oldest, { autoAlpha: 0, zIndex: 0 });
       }
     };
 
-    // 4. Start Sequence
-    // Fill initial stack
     for (let i = 0; i < CONFIG.mobile.maxVisible; i++) {
       timeoutIds.push(setTimeout(showNext, i * 100));
     }
 
-    // Infinite Loop
     const animateStack = () => {
       const delay = 600 + Math.random() * 600;
       timeoutIds.push(
         setTimeout(() => {
           showNext();
           animateStack();
-        }, delay)
+        }, delay),
       );
     };
 
-    // Start loop after initial stack fills
     timeoutIds.push(
-      setTimeout(animateStack, CONFIG.mobile.maxVisible * 100 + 300)
+      setTimeout(animateStack, CONFIG.mobile.maxVisible * 100 + 300),
     );
 
-    // Cleanup
     return () => {
       timeoutIds.forEach(clearTimeout);
       container.innerHTML = "";
     };
   }
 
-  // --- GENERAL: LINK DIMMING ---
   function initLinkHover() {
     const groups = document.querySelectorAll(CONFIG.selectors.linkGroups);
     groups.forEach((group) => {
@@ -400,7 +440,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         link.addEventListener("mouseleave", () => {
           links.forEach((other) =>
-            gsap.to(other, { opacity: 1, duration: 0.3 })
+            gsap.to(other, { opacity: 1, duration: 0.3 }),
           );
         });
       });
@@ -411,14 +451,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // --- GENERAL: NZ TIME ---
   function initNZTime() {
     const elements = document.querySelectorAll(CONFIG.selectors.timeElements);
     if (!elements.length) return;
 
     const update = () => {
       const nzTime = new Date(
-        new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" })
+        new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" }),
       );
       const timeStr = `${nzTime.getHours().toString().padStart(2, "0")}:${nzTime
         .getMinutes()
@@ -430,10 +469,11 @@ document.addEventListener("DOMContentLoaded", function () {
     setInterval(update, 1000);
   }
 
-  // --- MANAGER: HANDLE RESIZE ---
   function handleLayoutChange() {
+    if (!imagesLoaded) return;
+
     const isDesktop = window.matchMedia(
-      `(min-width: ${CONFIG.desktop.minWidth}px)`
+      `(min-width: ${CONFIG.desktop.minWidth}px)`,
     ).matches;
 
     if (isDesktop) {
@@ -451,9 +491,62 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // Init
+  function setupFooterProximityLoader() {
+    const desktopFooter = document.querySelector(
+      CONFIG.selectors.desktopFooter,
+    );
+    const mobileFooter = document.querySelector(CONFIG.selectors.mobileFooter);
+
+    const targets = [];
+    if (desktopFooter) targets.push(desktopFooter);
+    if (mobileFooter) targets.push(mobileFooter);
+
+    if (!targets.length) return;
+
+    const startLoad = () => {
+      if (imagesLoaded || imagesLoading) return;
+      loadFooterImages();
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      const onScroll = () => {
+        if (imagesLoaded || imagesLoading) return;
+        const near = targets.some((el) => {
+          const r = el.getBoundingClientRect();
+          return r.top < window.innerHeight + 900 && r.bottom > -900;
+        });
+        if (near) {
+          window.removeEventListener("scroll", onScroll, { passive: true });
+          startLoad();
+        }
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      return;
+    }
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (imagesLoaded || imagesLoading) return;
+        for (let i = 0; i < entries.length; i++) {
+          if (entries[i].isIntersecting) {
+            io.disconnect();
+            startLoad();
+            break;
+          }
+        }
+      },
+      {
+        root: null,
+        rootMargin: CONFIG.lazy.rootMargin,
+        threshold: CONFIG.lazy.threshold,
+      },
+    );
+
+    targets.forEach((el) => io.observe(el));
+  }
+
   initLinkHover();
   initNZTime();
-  handleLayoutChange();
-  window.addEventListener("resize", handleLayoutChange);
+  setupFooterProximityLoader();
 });
