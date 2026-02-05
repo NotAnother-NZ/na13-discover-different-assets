@@ -23,16 +23,39 @@
     return !!(coarse || small);
   };
 
+  const clampOrigin = (v) => {
+    const n = Number(v);
+    if (!isFinite(n)) return 50;
+    if (n < 0) return 0;
+    if (n > 100) return 100;
+    return n;
+  };
+
+  const parseOrigin = (raw) => {
+    if (raw == null) return 50;
+    const s = String(raw).trim();
+    if (!s) return 50;
+    const n = parseFloat(s);
+    return clampOrigin(n);
+  };
+
+  const applyOrigin = (el, origin) => {
+    if (!el) return;
+    const o = clampOrigin(origin);
+    el.style.objectPosition = `${o}% 50%`;
+  };
+
   const getItemData = (imgEl) => {
     const videoUrl = imgEl.getAttribute("data-mid-video-url") || "";
     const caption = imgEl.getAttribute("data-mid-caption") || "";
     const location = imgEl.getAttribute("data-mid-location") || "";
+    const origin = parseOrigin(imgEl.getAttribute("data-mid-origin"));
     const imgSrc =
       imgEl.getAttribute("src") ||
       imgEl.getAttribute("data-src") ||
       imgEl.getAttribute("data-lazy-src") ||
       "";
-    return { videoUrl, caption, location, imgSrc };
+    return { videoUrl, caption, location, imgSrc, origin };
   };
 
   const ensureWrapperOnly = (wrapperEl) => {
@@ -67,6 +90,8 @@
     v.style.zIndex = "0";
     v.style.opacity = "0";
 
+    applyOrigin(v, 50);
+
     return v;
   };
 
@@ -87,6 +112,8 @@
     img.style.opacity = "0";
     img.style.display = "block";
     img.style.pointerEvents = "none";
+
+    applyOrigin(img, 50);
 
     return img;
   };
@@ -568,6 +595,7 @@
       if (nextStandby) {
         state.standby = nextStandby;
         const nextS = state.slides[clampIndex(idx + 1, len)];
+        applyOrigin(nextStandby, nextS.origin);
         if (state.mode === "image") {
           loadImageSource(nextStandby, nextS.imgSrc);
         } else {
@@ -576,6 +604,8 @@
           waitForPrimedAtZero(nextStandby);
         }
       }
+
+      applyOrigin(incoming, s.origin);
 
       if (state.mode === "image") {
         loadImageSource(incoming, s.imgSrc);
@@ -702,9 +732,14 @@
     const secondSlideIdx = clampIndex(1, state.slides.length);
 
     if (state.mode === "image") {
+      applyOrigin(state.active, state.slides[0].origin);
       loadImageSource(state.active, state.slides[0].imgSrc);
-      if (state.standby)
+
+      if (state.standby) {
+        applyOrigin(state.standby, state.slides[secondSlideIdx].origin);
         loadImageSource(state.standby, state.slides[secondSlideIdx].imgSrc);
+      }
+
       state.pool.forEach((el, i) => {
         if (i === 0) {
           el.style.display = "block";
@@ -715,8 +750,12 @@
         }
       });
     } else {
+      applyOrigin(state.active, state.slides[0].origin);
       loadVideoSource(state.active, state.slides[0].videoUrl);
+
+      applyOrigin(state.standby, state.slides[secondSlideIdx].origin);
       loadVideoSource(state.standby, state.slides[secondSlideIdx].videoUrl);
+
       forceMuted(state.standby);
       waitForPrimedAtZero(state.standby);
 
