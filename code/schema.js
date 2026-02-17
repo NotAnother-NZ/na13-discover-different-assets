@@ -40,13 +40,13 @@
 
       rawContent = rawContent.replace(
         /&(?![a-zA-Z]+;|#\d+;|#x[0-9a-fA-F]+;)/g,
-        "&amp;"
+        "&amp;",
       );
 
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(
         `<root>${rawContent}</root>`,
-        "text/xml"
+        "text/xml",
       );
 
       const parseError = xmlDoc.querySelector("parsererror");
@@ -77,7 +77,7 @@
             const src = (images[j].textContent || "").trim();
             if (src) {
               imgHTML += `<img src="${escapeAttr(
-                src
+                src,
               )}" loading="lazy" alt="" class="gallery-image" draggable="false">`;
             }
           }
@@ -106,13 +106,13 @@
         } else if (tagName === "paragraph") {
           const html = renderInlineNodes(node);
           outputHTML.push(
-            `<div class="paragraph-block"><p class="title5-1">${html.trim()}</p></div>`
+            `<div class="paragraph-block"><p class="title5-1">${html.trim()}</p></div>`,
           );
         } else if (tagName === "title") {
           outputHTML.push(
             `<div class="title-block"><h2 class="title4-1">${escapeHTML(
-              (node.textContent || "").trim()
-            )}</h2></div>`
+              (node.textContent || "").trim(),
+            )}</h2></div>`,
           );
         } else if (tagName === "list") {
           const items = node.getElementsByTagName("item");
@@ -176,6 +176,19 @@
 
       if (name === "underline") {
         html += `<u>${renderInlineNodes(child)}</u>`;
+        return;
+      }
+
+      if (name === "link") {
+        const rawUrl = (child.getAttribute("url") || "").trim();
+        const inner = renderInlineNodes(child).trim();
+        if (rawUrl) {
+          html += `<a href="${escapeAttr(
+            rawUrl,
+          )}" data-underline="" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+        } else {
+          html += inner || escapeHTML(child.textContent || "");
+        }
         return;
       }
 

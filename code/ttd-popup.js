@@ -7,7 +7,7 @@
     openBtnSelector: "#open-ttd-popup",
     closeBtnSelector: "#close-ttd-popup",
     closeTriggerSelector: "#close-ttd-popup-trigger",
-    saveBtnSelector: "#popup-save", // Added selector
+    saveBtnSelector: "#popup-save",
     legacyCloseBtnSelector: "#history-back",
     overlayClickSelector: ".fixed-hero-bg-overlay",
     overlayScrollWrapperSelector: ".schema-content-list-wrapper",
@@ -354,15 +354,25 @@
     imgEl.setAttribute("src", src);
   }
 
+  function normalizeUrlLike(v) {
+    const s = v == null ? "" : String(v);
+    const trimmed = s.trim();
+    if (!trimmed) return "";
+    if (trimmed === "#") return "";
+    if (/^\s*javascript:/i.test(trimmed)) return "";
+    return trimmed;
+  }
+
   function setLink(linkEl, href) {
     if (!linkEl) return;
-    if (!href || href === "#") {
+    const normalized = normalizeUrlLike(href);
+    if (!normalized) {
       linkEl.classList.add("w-condition-invisible");
       linkEl.setAttribute("href", "#");
       return;
     }
     linkEl.classList.remove("w-condition-invisible");
-    linkEl.setAttribute("href", href);
+    linkEl.setAttribute("href", normalized);
   }
 
   function resolveCardRoot(fromEl) {
@@ -424,6 +434,27 @@
     dealIconTarget.innerHTML = dealIconSrc.innerHTML;
   }
 
+  function getBookingHrefFromPayload(payload) {
+    if (!payload) return "";
+    const node = payload.querySelector("[data-ttd-booking-content]");
+    if (!node) return "";
+    let v = "";
+    try {
+      v =
+        node.getAttribute("data-ttd-booking-content") ||
+        node.getAttribute("href") ||
+        "";
+    } catch (e) {}
+    return normalizeUrlLike(v);
+  }
+
+  function getPositionTextFromPayload(payload) {
+    if (!payload) return "";
+    const node = payload.querySelector("[data-ttd-position-content]");
+    if (!node) return "";
+    return (node.textContent || "").trim();
+  }
+
   function fillPopupFromCard(cardEl) {
     if (!shellEl) return false;
     if (!cardEl) return false;
@@ -433,28 +464,44 @@
 
     const categorySrc = payload.querySelector("[data-ttd-category-content]");
     const titleSrc = payload.querySelector("[data-ttd-title-content]");
+    const introSrc = payload.querySelector("[data-ttd-intro-content]");
     const schemaSrc = payload.querySelector("[data-ttd-schema-content]");
     const imageSrc = payload.querySelector("[data-ttd-image-content]");
     const iconSrc = payload.querySelector("[data-ttd-icon-content]");
-    const bookingSrc = payload.querySelector("[data-ttd-booking-content]");
 
     const categoryTarget = shellEl.querySelector(".ttd-tags .title6-1");
     const titleTarget = shellEl.querySelector(".ttd-header h1");
+    const introTarget = shellEl.querySelector(".ttd-header h2");
     const schemaTarget = shellEl.querySelector(
-      ".ttd-content .schema[data-schema]"
+      ".ttd-content .schema[data-schema]",
     );
     const iconTarget = shellEl.querySelector(".category-filter-button-icon");
 
-    const bookingTarget = shellEl.querySelector(".ttd-content a.cta4");
+    const bookingTarget = shellEl.querySelector("a.cta4");
     const explicitImgTarget = shellEl.querySelector("[data-ttd-popup-image]");
     const fallbackImgTarget = shellEl.querySelector(".ttd-content img");
     const imgTarget = explicitImgTarget || fallbackImgTarget;
 
-    // Select the save button using the ID
     const saveTarget = document.querySelector(CFG.saveBtnSelector);
+    const indexTarget = document.querySelector("#ttd-index");
 
     setText(categoryTarget, categorySrc ? categorySrc.textContent.trim() : "");
     setText(titleTarget, titleSrc ? titleSrc.textContent.trim() : "");
+
+    if (introTarget) {
+      if (introSrc) {
+        introTarget.classList.remove("w-condition-invisible");
+        setText(introTarget, introSrc.textContent.trim());
+      } else {
+        setText(introTarget, "");
+        introTarget.classList.add("w-condition-invisible");
+      }
+    }
+
+    if (indexTarget) {
+      const posText = getPositionTextFromPayload(payload);
+      if (posText) setText(indexTarget, posText);
+    }
 
     if (schemaTarget) {
       schemaTarget.innerHTML = schemaSrc ? schemaSrc.innerHTML : "";
@@ -462,7 +509,7 @@
         window.rtSchemaRender(shellEl);
       } else {
         console.error(
-          "[ttd-popup] window.rtSchemaRender not found. Ensure schema.js is loaded before popup.js"
+          "[ttd-popup] window.rtSchemaRender not found. Ensure schema.js is loaded before popup.js",
         );
       }
     }
@@ -480,11 +527,10 @@
     }
 
     if (bookingTarget) {
-      const href = bookingSrc ? bookingSrc.getAttribute("href") : "";
+      const href = getBookingHrefFromPayload(payload);
       setLink(bookingTarget, href);
     }
 
-    // NEW: Update the save button's data-saved-slug attribute
     if (saveTarget) {
       const slug = cardEl.getAttribute("data-saved-slug") || "";
       saveTarget.setAttribute("data-saved-slug", slug);
@@ -527,7 +573,7 @@
         e.preventDefault();
         handleOpenFlowFromCard(cardRoot);
       },
-      true
+      true,
     );
   }
 
@@ -620,7 +666,7 @@
           return;
         }
       },
-      true
+      true,
     );
   }
 
@@ -635,7 +681,7 @@
           return;
         }
       },
-      true
+      true,
     );
 
     document.addEventListener(
@@ -643,7 +689,7 @@
       (e) => {
         if (e.key === "Escape") unlockBackgroundScrollUltra();
       },
-      { passive: true }
+      { passive: true },
     );
   }
 
@@ -662,7 +708,7 @@ ${CFG.overlayScrollWrapperSelector} {
   touch-action: pan-y;
   pointer-events: none;
 }
-      `.trim()
+      `.trim(),
     );
   }
 
@@ -696,7 +742,7 @@ ${CFG.overlayScrollWrapperSelector} {
       () => {
         forceCleanupIfNotDesktop();
       },
-      { passive: true }
+      { passive: true },
     );
   }
 
