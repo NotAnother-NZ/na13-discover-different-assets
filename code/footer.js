@@ -12,9 +12,9 @@ document.addEventListener("DOMContentLoaded", function () {
     images: {
       baseUrl:
         "https://cdn.jsdelivr.net/gh/NotAnother-NZ/na13-discover-different-assets@1.0.3/footer_images/",
-      count: 20,
       extension: ".webp",
-      startAt: 1,
+      allowed: [2, 4, 5, 6, 8, 12, 13, 16, 18, 20],
+      excluded: [1, 3, 7, 9, 10, 11, 14, 15, 17, 19, 20],
     },
     desktop: {
       minWidth: 992,
@@ -41,9 +41,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function buildImageUrls() {
     const urls = [];
-    for (let i = CONFIG.images.startAt; i <= CONFIG.images.count; i++) {
-      urls.push(`${CONFIG.images.baseUrl}${i}${CONFIG.images.extension}`);
+    const allowed = CONFIG.images.allowed;
+
+    for (let i = 0; i < allowed.length; i++) {
+      const index = allowed[i];
+      urls.push(`${CONFIG.images.baseUrl}${index}${CONFIG.images.extension}`);
     }
+
     return urls;
   }
 
