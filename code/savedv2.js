@@ -453,6 +453,77 @@
 
   };
 
+  const list = document.getElementById("events-slider-list");
+const markCompleted = () => {
+  ["events", "view-events", "view-events-mobile"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("completed"); // ✅ Add class instead of display:none
+  });
+};
+
+if (!list) return markCompleted();
+
+const items = list.querySelectorAll(".events-slider-list-item");
+if (!items.length) return markCompleted();
+
+const YR = /\d{4}$/,
+  AL = /[a-zA-Z]/,
+  DG = /^\d+\s*/;
+const now = new Date();
+now.setHours(0, 0, 0, 0);
+const today = now.getTime();
+const curYr = now.getFullYear();
+
+const valid = [],
+  expired = []; // ✅ Renamed from trash → expired (for clarity)
+
+for (let i = 0, n = items.length; i < n; i++) {
+  const el = items[i];
+  if (!el.parentNode) continue;
+
+  const txt = el.querySelector("[data-sort-date]")?.textContent;
+  if (!txt) continue;
+
+  let s,
+    e,
+    c = txt.trim();
+  let y = (c.match(YR) || [curYr])[0];
+
+  if (c.includes("-")) {
+    let p = c.split("-"),
+      p1 = p[0].trim(),
+      p2 = p[1].trim();
+    e = new Date(p2);
+    if (AL.test(p1)) s = new Date(`${p1} ${y}`);
+    else s = new Date(`${p1} ${p2.replace(DG, "")}`);
+  } else {
+    s = new Date(c);
+    e = new Date(c);
+  }
+
+  e.setHours(23, 59, 59, 999);
+  s.setHours(0, 0, 0, 0);
+
+  const eTime = e.getTime(),
+    sTime = s.getTime();
+
+  if (eTime < today) expired.push(el); // ✅ Collect expired (won't be removed)
+  else
+    valid.push({ el, t: sTime <= today && eTime >= today ? today : sTime });
+}
+
+if (!valid.length) return markCompleted();
+
+requestAnimationFrame(() => {
+  expired.forEach((el) => el.classList.add("completed")); // ✅ Add class instead of remove()
+
+  valid.sort((a, b) => a.t - b.t); // ✅ SORTING HAPPENS HERE (see note below)
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < valid.length; i++) frag.appendChild(valid[i].el);
+  const sp = list.querySelector(".events-slider-spacer:last-child");
+  sp ? list.insertBefore(frag, sp) : list.appendChild(frag);
+});
+
   setupObserver();
 
   if (document.readyState === "loading")
